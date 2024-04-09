@@ -1,19 +1,69 @@
 package curso.api.rest.controle;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import curso.api.rest.model.Usuario;
+import curso.api.rest.repository.UsuarioRepository;
+
 @RestController
 @RequestMapping(value = "/usuario")
 public class IndexControler {
+	
+	@Autowired
+	private UsuarioRepository usuarioRepository;
 	//serviço RestFull
-	@GetMapping(value = "/", produces = "aplication/json")
-	public ResponseEntity init(@RequestParam(value = "nome", required = false, defaultValue = "Nome não informado")String nome) {
-		System.out.println("Parametro Sendo Recebido:"+nome);
-		return new ResponseEntity("Olá Usuário Rest Springboot, seu nome é:"+nome, HttpStatus.OK);
+	@GetMapping(value = "/{id}/codigovenda/{venda}", produces = "application/pdf")
+	public ResponseEntity<Usuario> relatorio(@PathVariable(value = "id") Long id, @PathVariable(value = "venda") Long venda) {
+		
+		Optional<Usuario> usuario = usuarioRepository.findById(id);
+		return new ResponseEntity(usuario.get(), HttpStatus.OK);
+	}
+	@GetMapping(value = "/", produces = "application/json")
+	@CacheEvict(value="cacheUsuario", allEntries = true)
+	@CachePut("cacheUsuarios")
+	public ResponseEntity<List<Usuario>> Usuario()throws InterruptedException{
+		List<Usuario>  list  = (List<Usuario>)usuarioRepository.findAll();
+		return new ResponseEntity<List<Usuario>>(list, HttpStatus.OK);
+	}
+	@PostMapping(value = "/", produces = "application/json")
+	public ResponseEntity<Usuario> cadastrar(@RequestBody Usuario usuario){
+		Usuario usuarioSalvo = usuarioRepository.save(usuario);
+		return new ResponseEntity<Usuario>(usuarioSalvo, HttpStatus.OK);
+	}
+	@DeleteMapping(value = "/{id}", produces = "paplication/text")
+	public String delete (@PathVariable("id")long id) {
+		usuarioRepository.deleteById(id);
+		return "ok";
+	}
+	@PutMapping(value ="/", produces ="aplication/json")
+	public ResponseEntity<Usuario> atualizar(@RequestBody Usuario usuario){
+		for(int pos = 0;pos<usuario.getTelefones().size();pos++) {
+			usuario.getTelefones().get(pos).setUsuario(usuario);
+		}
+		Usuario userTempo = usuarioRepository.findUserByLogin(usuario.getLogin());
+		if(!userTempo.getSenha().equals(usuario.getSenha())) {
+			String senhaCriptografada = new BCryptPasswordEncoder().encode(usuario.getSenha());
+		}
+		Usuario usuarioSalvo = usuarioRepository.save(usuario);
+		return new ResponseEntity<Usuario>(usuarioSalvo, HttpStatus.OK);
 	}
 }
